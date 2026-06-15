@@ -1,6 +1,6 @@
-export function createBusinessProfileService({ store }) {
-  function getProfile(tenantId) {
-    const profile = store.businessProfiles.get(tenantId);
+export function createBusinessProfileService({ businessProfileRepository }) {
+  async function getProfile(tenantId) {
+    const profile = await businessProfileRepository.findByTenantId(tenantId);
 
     if (!profile) {
       throw createHttpError(404, "Business profile was not found for this tenant.");
@@ -9,12 +9,12 @@ export function createBusinessProfileService({ store }) {
     return structuredClone(profile);
   }
 
-  function updateProfile(tenantId, payload) {
-    const profile = getProfile(tenantId);
+  async function updateProfile(tenantId, payload) {
+    const profile = await getProfile(tenantId);
 
     const nextProfile = {
-      ...profile,
       businessName: payload.businessName ?? profile.businessName,
+      description: payload.description ?? profile.description,
       locationLabel: payload.locationLabel ?? profile.locationLabel,
       fullAddress: payload.fullAddress ?? profile.fullAddress,
       paymentMethods: Array.isArray(payload.paymentMethods)
@@ -22,8 +22,8 @@ export function createBusinessProfileService({ store }) {
         : profile.paymentMethods,
     };
 
-    store.businessProfiles.set(tenantId, nextProfile);
-    return structuredClone(nextProfile);
+    const updated = await businessProfileRepository.updateByTenantId(tenantId, nextProfile);
+    return structuredClone(updated);
   }
 
   return {

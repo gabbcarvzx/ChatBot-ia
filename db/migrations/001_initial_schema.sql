@@ -1,4 +1,9 @@
-CREATE TABLE tenants (
+CREATE TABLE IF NOT EXISTS schema_migrations (
+  id TEXT PRIMARY KEY,
+  applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS tenants (
   id UUID PRIMARY KEY,
   name TEXT NOT NULL,
   slug TEXT NOT NULL UNIQUE,
@@ -10,19 +15,20 @@ CREATE TABLE tenants (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
   id UUID PRIMARY KEY,
   tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   owner_name TEXT NOT NULL,
-  email TEXT NOT NULL UNIQUE,
+  email TEXT NOT NULL,
   password_hash TEXT NOT NULL,
   role TEXT NOT NULL DEFAULT 'owner',
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (tenant_id, email)
 );
 
-CREATE INDEX idx_users_tenant_id ON users (tenant_id);
+CREATE INDEX IF NOT EXISTS idx_users_tenant_id ON users (tenant_id);
 
-CREATE TABLE business_profiles (
+CREATE TABLE IF NOT EXISTS business_profiles (
   id UUID PRIMARY KEY,
   tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   business_name TEXT NOT NULL,
@@ -35,7 +41,7 @@ CREATE TABLE business_profiles (
   UNIQUE (tenant_id)
 );
 
-CREATE TABLE business_hours (
+CREATE TABLE IF NOT EXISTS business_hours (
   id UUID PRIMARY KEY,
   tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   weekday SMALLINT NOT NULL,
@@ -44,9 +50,9 @@ CREATE TABLE business_hours (
   is_closed BOOLEAN NOT NULL DEFAULT FALSE
 );
 
-CREATE INDEX idx_business_hours_tenant_weekday ON business_hours (tenant_id, weekday);
+CREATE INDEX IF NOT EXISTS idx_business_hours_tenant_weekday ON business_hours (tenant_id, weekday);
 
-CREATE TABLE catalog_items (
+CREATE TABLE IF NOT EXISTS catalog_items (
   id UUID PRIMARY KEY,
   tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   item_type TEXT NOT NULL,
@@ -58,9 +64,9 @@ CREATE TABLE catalog_items (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_catalog_items_tenant_name ON catalog_items (tenant_id, name);
+CREATE INDEX IF NOT EXISTS idx_catalog_items_tenant_name ON catalog_items (tenant_id, name);
 
-CREATE TABLE faq_items (
+CREATE TABLE IF NOT EXISTS faq_items (
   id UUID PRIMARY KEY,
   tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   question TEXT NOT NULL,
@@ -68,9 +74,9 @@ CREATE TABLE faq_items (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_faq_items_tenant_id ON faq_items (tenant_id);
+CREATE INDEX IF NOT EXISTS idx_faq_items_tenant_id ON faq_items (tenant_id);
 
-CREATE TABLE subscriptions (
+CREATE TABLE IF NOT EXISTS subscriptions (
   id UUID PRIMARY KEY,
   tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   provider TEXT NOT NULL DEFAULT 'asaas',
@@ -84,52 +90,49 @@ CREATE TABLE subscriptions (
   UNIQUE (provider, external_subscription_id)
 );
 
-CREATE INDEX idx_subscriptions_tenant_status ON subscriptions (tenant_id, status);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_tenant_status ON subscriptions (tenant_id, status);
 
-CREATE TABLE conversations (
+CREATE TABLE IF NOT EXISTS conversations (
   id UUID PRIMARY KEY,
   tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   customer_phone TEXT NOT NULL,
   status TEXT NOT NULL,
   started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  last_message_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  UNIQUE (tenant_id, id)
+  last_message_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_conversations_tenant_customer ON conversations (tenant_id, customer_phone);
+CREATE INDEX IF NOT EXISTS idx_conversations_tenant_customer ON conversations (tenant_id, customer_phone);
 
-CREATE TABLE messages (
+CREATE TABLE IF NOT EXISTS messages (
   id UUID PRIMARY KEY,
   tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  conversation_id UUID NOT NULL,
+  conversation_id UUID NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
   direction TEXT NOT NULL,
   provider_message_id TEXT,
   content TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  UNIQUE (tenant_id, provider_message_id),
-  FOREIGN KEY (tenant_id, conversation_id) REFERENCES conversations(tenant_id, id) ON DELETE CASCADE
+  UNIQUE (tenant_id, provider_message_id)
 );
 
-CREATE INDEX idx_messages_tenant_conversation ON messages (tenant_id, conversation_id);
+CREATE INDEX IF NOT EXISTS idx_messages_tenant_conversation ON messages (tenant_id, conversation_id);
 
-CREATE TABLE leads (
+CREATE TABLE IF NOT EXISTS leads (
   id UUID PRIMARY KEY,
   tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  conversation_id UUID NOT NULL,
+  conversation_id UUID NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
   customer_name TEXT,
   customer_phone TEXT NOT NULL,
   interest_summary TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'new',
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  FOREIGN KEY (tenant_id, conversation_id) REFERENCES conversations(tenant_id, id) ON DELETE CASCADE
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_leads_tenant_status ON leads (tenant_id, status);
+CREATE INDEX IF NOT EXISTS idx_leads_tenant_status ON leads (tenant_id, status);
 
-CREATE TABLE pre_appointments (
+CREATE TABLE IF NOT EXISTS pre_appointments (
   id UUID PRIMARY KEY,
   tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  conversation_id UUID NOT NULL,
+  conversation_id UUID NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
   customer_name TEXT,
   customer_phone TEXT NOT NULL,
   requested_service TEXT NOT NULL,
@@ -137,13 +140,12 @@ CREATE TABLE pre_appointments (
   preferred_time_window TEXT,
   notes TEXT,
   status TEXT NOT NULL DEFAULT 'pending_confirmation',
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  FOREIGN KEY (tenant_id, conversation_id) REFERENCES conversations(tenant_id, id) ON DELETE CASCADE
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_pre_appointments_tenant_status ON pre_appointments (tenant_id, status);
+CREATE INDEX IF NOT EXISTS idx_pre_appointments_tenant_status ON pre_appointments (tenant_id, status);
 
-CREATE TABLE usage_counters (
+CREATE TABLE IF NOT EXISTS usage_counters (
   id UUID PRIMARY KEY,
   tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   reference_month DATE NOT NULL,
@@ -155,7 +157,7 @@ CREATE TABLE usage_counters (
   UNIQUE (tenant_id, reference_month)
 );
 
-CREATE TABLE audit_logs (
+CREATE TABLE IF NOT EXISTS audit_logs (
   id UUID PRIMARY KEY,
   tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   event_type TEXT NOT NULL,
@@ -164,4 +166,4 @@ CREATE TABLE audit_logs (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_audit_logs_tenant_event ON audit_logs (tenant_id, event_type);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_tenant_event ON audit_logs (tenant_id, event_type);
