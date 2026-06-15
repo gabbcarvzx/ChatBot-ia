@@ -9,5 +9,6 @@ export function loadConfig(env = process.env) {
     port: readInt(env.PORT, 3000),
     authSecret: env.AUTH_SECRET ?? "dev-auth-secret-change-me",
     logLevel: env.LOG_LEVEL ?? "info",
+    databaseUrl: env.DATABASE_URL ?? "",
   };
 }

@@ -19,8 +19,18 @@ Base inicial do MVP do AtendeAI, um SaaS multi-tenant para assistente de WhatsAp
   - `GET /v1/business-profile`
   - `PUT /v1/business-profile`
 - contrato inicial de contexto e policy para integracao com LLM
-- schema SQL inicial para Postgres
+- migrations SQL versionadas para Postgres
 - testes automatizados do dominio com `node --test`
+
+## Banco de dados
+
+Defina `DATABASE_URL` com a connection string do seu banco Neon antes de subir a API ou rodar testes.
+
+Para aplicar migrations:
+
+```bash
+npm run db:migrate
+```
 
 ## Rodando a API
 
@@ -41,9 +51,11 @@ npm test
 ```text
 docs/specs/                  documentacao do produto
 db/schema.sql                modelagem relacional inicial
+db/migrations/               migrations SQL versionadas
 src/api/                     camada HTTP inicial
 src/app/                     bootstrap e configuracao da aplicacao
 src/auth/                    auth, hash e token
+src/db/                      pool, migrator e repositorios SQL
 src/domain/                  regras centrais de plano e tenant
 src/llm/                     contrato e policy do LLM
 src/observability/           logging
@@ -54,9 +66,8 @@ test/domain/                 regressao do dominio central
 
 ## Proximas etapas recomendadas
 
-1. trocar storage em memoria por Postgres real + migrations
-2. implementar onboarding wizard completo
-3. expandir CRUD tenant-scoped para FAQ e catalogo/servicos
-4. integrar WhatsApp Cloud API
-5. integrar Asaas
-6. plugar um provider de LLM com schema validation
+1. implementar onboarding wizard completo
+2. expandir CRUD tenant-scoped para FAQ e catalogo/servicos
+3. integrar WhatsApp Cloud API
+4. integrar Asaas
+5. plugar um provider de LLM com schema validation

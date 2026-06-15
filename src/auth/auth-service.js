@@ -1,82 +1,107 @@
+import { randomUUID } from "node:crypto";
+
 import { hashPassword, verifyPassword } from "./passwords.js";
 
-export function createAuthService({ store, tokenService }) {
-  function registerOwner(input) {
+export function createAuthService({
+  pool,
+  tenantRepository,
+  userRepository,
+  businessProfileRepository,
+  tokenService,
+}) {
+  async function registerOwner(input) {
     const email = input.email.trim().toLowerCase();
     const slug = input.companySlug.trim().toLowerCase();
 
-    if (store.usersByEmail.has(email)) {
+    const existingUser = await userRepository.findByEmail(email);
+    if (existingUser) {
       throw createHttpError(409, "Email is already registered.");
     }
 
-    if (store.tenantsBySlug.has(slug)) {
+    const existingTenant = await tenantRepository.findBySlug(slug);
+    if (existingTenant) {
       throw createHttpError(409, "Company slug is already in use.");
     }
 
-    const tenant = {
-      id: store.nextId(),
-      name: input.companyName.trim(),
-      slug,
-      vertical: input.vertical,
-      planCode: input.planCode,
-      subscriptionStatus: "trial",
-      businessWhatsApp: null,
-      createdAt: new Date().toISOString(),
-    };
+    const client = await pool.connect();
 
-    const user = {
-      id: store.nextId(),
-      tenantId: tenant.id,
-      ownerName: input.ownerName.trim(),
-      email,
-      passwordHash: hashPassword(input.password),
-      role: "owner",
-      createdAt: new Date().toISOString(),
-    };
+    try {
+      await client.query("BEGIN");
 
-    const profile = {
-      tenantId: tenant.id,
-      businessName: tenant.name,
-      locationLabel: null,
-      fullAddress: null,
-      paymentMethods: [],
-    };
+      const tenant = await tenantRepository.create(client, {
+        id: randomUUID(),
+        name: input.companyName.trim(),
+        slug,
+        vertical: input.vertical,
+        planCode: input.planCode,
+        subscriptionStatus: "trial",
+        businessWhatsApp: input.businessWhatsApp ?? null,
+      });
 
-    store.tenants.set(tenant.id, tenant);
-    store.tenantsBySlug.set(tenant.slug, tenant.id);
-    store.users.set(user.id, user);
-    store.usersByEmail.set(user.email, user.id);
-    store.businessProfiles.set(tenant.id, profile);
+      const user = await userRepository.create(client, {
+        id: randomUUID(),
+        tenantId: tenant.id,
+        ownerName: input.ownerName.trim(),
+        email,
+        passwordHash: hashPassword(input.password),
+        role: "owner",
+      });
 
-    const accessToken = tokenService.sign({
-      sub: user.id,
-      tenantId: tenant.id,
-      role: user.role,
-      email: user.email,
-    });
+      await businessProfileRepository.create(client, {
+        id: randomUUID(),
+        tenantId: tenant.id,
+        businessName: tenant.name,
+        description: null,
+        locationLabel: null,
+        fullAddress: null,
+        paymentMethods: [],
+      });
 
-    return {
-      accessToken,
-      user: sanitizeUser(user),
-      tenant: sanitizeTenant(tenant),
-    };
+      await client.query("COMMIT");
+
+      const accessToken = tokenService.sign({
+        sub: user.id,
+        tenantId: tenant.id,
+        role: user.role,
+        email: user.email,
+      });
+
+      return {
+        accessToken,
+        user: sanitizeUser(user),
+        tenant: sanitizeTenant(tenant),
+      };
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => {});
+
+      if (isUniqueViolation(error)) {
+        throw mapUniqueViolation(error);
+      }
+
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
-  function login({ email, password }) {
+  async function login({ email, password }) {
     const normalizedEmail = email.trim().toLowerCase();
-    const userId = store.usersByEmail.get(normalizedEmail);
+    const user = await userRepository.findByEmail(normalizedEmail);
 
-    if (!userId) {
+    if (!user) {
       throw createHttpError(401, "Invalid credentials.");
     }
-
-    const user = store.users.get(userId);
 
     if (!verifyPassword(password, user.passwordHash)) {
       throw createHttpError(401, "Invalid credentials.");
     }
 
-    const tenant = store.tenants.get(user.tenantId);
+    const tenant = await tenantRepository.findById(user.tenantId);
+
+    if (!tenant) {
+      throw createHttpError(401, "Access token subject is no longer valid.");
+    }
+
     const accessToken = tokenService.sign({
       sub: user.id,
       tenantId: tenant.id,
@@ -91,15 +116,15 @@ export function createAuthService({ store, tokenService }) {
     };
   }
 
-  function authenticateBearerToken(token) {
+  async function authenticateBearerToken(token) {
     const claims = tokenService.verify(token);
 
     if (!claims) {
       throw createHttpError(401, "Invalid access token.");
     }
 
-    const user = store.users.get(claims.sub);
-    const tenant = store.tenants.get(claims.tenantId);
+    const user = await userRepository.findById(claims.sub);
+    const tenant = await tenantRepository.findById(claims.tenantId);
 
     if (!user || !tenant) {
       throw createHttpError(401, "Access token subject is no longer valid.");
@@ -138,6 +163,18 @@ function sanitizeTenant(tenant) {
     planCode: tenant.planCode,
     subscriptionStatus: tenant.subscriptionStatus,
   };
+}
+
+function isUniqueViolation(error) {
+  return error?.code === "23505";
+}
+
+function mapUniqueViolation(error) {
+  if (error.constraint?.includes("slug")) {
+    return createHttpError(409, "Company slug is already in use.");
+  }
+
+  return createHttpError(409, "Email is already registered.");
 }
 
 function createHttpError(statusCode, message) {
