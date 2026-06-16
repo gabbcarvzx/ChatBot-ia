@@ -8,6 +8,10 @@ export function loadConfig(env = process.env) {
     appEnv: env.NODE_ENV ?? "development",
     port: readInt(env.PORT, 3000),
     authSecret: env.AUTH_SECRET ?? "dev-auth-secret-change-me",
+    asaasWebhookSecret: env.ASAAS_WEBHOOK_SECRET ?? "",
+    geminiApiKey: env.GEMINI_API_KEY ?? "",
+    geminiModel: env.GEMINI_MODEL ?? "",
+    whatsappCloudApiVerifyToken: env.WHATSAPP_CLOUD_API_VERIFY_TOKEN ?? "",
     logLevel: env.LOG_LEVEL ?? "info",
     databaseUrl: env.DATABASE_URL ?? "",
   };

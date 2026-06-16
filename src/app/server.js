@@ -1,8 +1,8 @@
 import { createHttpServer } from "../api/http.js";
 import { loadConfig } from "./config.js";
 
-export function createServer() {
-  return createHttpServer();
+export function createServer(overrides = {}) {
+  return createHttpServer(overrides);
 }
 
 if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1].replace(/\\/g, "/")}`).href) {

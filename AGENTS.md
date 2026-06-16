@@ -4,11 +4,32 @@
 
 **Nome:** AtendeAI  
 **Tipo:** SaaS multi-tenant de assistente de IA para WhatsApp  
-**Objetivo:** permitir que pequenos negocios usem um bot no WhatsApp para responder perguntas, capturar leads e registrar pre-agendamentos com controle por plano.
+**Objetivo:** permitir que pequenos negocios usem um bot no WhatsApp para responder perguntas, capturar leads e registrar pre-agendamentos com controle por plano e cobranca recorrente.
+
+## Estado atual do produto
+
+O AtendeAI nao e mais apenas fundacao de dominio. O repositorio agora possui:
+
+- backend API Node tenant-scoped
+- Postgres real com Neon e migrations versionadas
+- autenticacao de owner por tenant
+- onboarding operacional inicial
+- painel administrativo Next.js em `apps/admin`
+- sincronizacao inbound de billing com Asaas
+
+Ainda nao possui:
+
+- integracao real com WhatsApp Cloud API
+- pipeline fim a fim de conversas
+- provider real de LLM
+- inbox de leads e pre-agendamentos
+- criacao de assinatura no Asaas a partir do painel
+
+O objetivo do proximo ciclo continua sendo sair de fundacao tecnica para MVP comercializavel.
 
 ## Produto e proposta
 
-O AtendeAI e um produto comercial, nao um projeto academico. Toda decisao tecnica deve considerar:
+Toda decisao tecnica deve considerar:
 
 - escalabilidade para centenas e milhares de tenants
 - isolamento real entre tenants
@@ -28,7 +49,7 @@ Nichos iniciais:
 
 ## Escopo do MVP
 
-Cada tenant podera cadastrar:
+Cada tenant deve poder cadastrar:
 
 - nome da empresa
 - numero de WhatsApp
@@ -66,28 +87,66 @@ Fora de escopo no MVP:
 
 Arquivos principais do projeto:
 
+- `AGENTS.md`: memoria operacional do projeto
+- `README.md`: visao de uso rapido e superficie atual
 - `docs/specs/2026-06-15-atendeai-mvp.md`: especificacao funcional do MVP
-- `db/schema.sql`: modelagem inicial do banco
-- `src/domain/policy.js`: regras de plano, quota, bloqueio e validacao
-- `src/domain/orchestrator.js`: fluxo central de processamento da mensagem
-- `src/domain/templates.js`: templates de nicho
+- `docs/architecture/2026-06-15-project-state.md`: fotografia da arquitetura atual
+- `docs/operations/2026-06-15-end-of-day-handoff.md`: handoff de retomada
+- `docs/roadmaps/2026-06-15-readiness-execution.md`: progresso do plano de readiness
+- `db/schema.sql`: modelagem base do banco
+- `src/domain/policy.js`: regras de plano, quota e bloqueio
+- `src/domain/orchestrator.js`: fluxo central de processamento de mensagem
+- `src/domain/templates.js`: templates por nicho
 - `src/llm/contract.js`: contrato de contexto e saida do LLM
-- `test/domain/`: testes automatizados do dominio
+- `test/domain/`: regressao do dominio central
 
-Sempre ler esses arquivos antes de fazer mudancas estruturais.
+Antes de mudancas estruturais, ler ao menos:
+
+1. `AGENTS.md`
+2. `docs/specs/2026-06-15-atendeai-mvp.md`
+3. `docs/architecture/2026-06-15-project-state.md`
+4. `README.md`
 
 ## Arquitetura obrigatoria
 
 Separacao obrigatoria de camadas:
 
-- **Frontend:** painel administrativo do tenant
+- **Frontend:** painel administrativo do tenant em `apps/admin`
 - **Backend API:** autenticacao, CRUD tenant-scoped, billing, inbox e configuracao
-- **Motor conversacional:** interpretacao, politica, LLM, acao estruturada
+- **Motor conversacional:** interpretacao, policy, LLM, acao estruturada
 - **Adaptador WhatsApp:** entrada e saida de mensagens
 - **Billing adapter:** Asaas
 - **Banco:** relacional com `tenantId` em todas as entidades de negocio
 
 Toda entidade de negocio deve carregar `tenantId`.
+
+## Estrutura atual esperada
+
+```text
+apps/
+  admin/
+db/
+  migrations/
+docs/
+  architecture/
+  operations/
+  roadmaps/
+  specs/
+src/
+  api/
+  app/
+  auth/
+  billing/
+  db/
+  domain/
+  llm/
+  observability/
+  tenants/
+test/
+  api/
+  db/
+  domain/
+```
 
 ## Regras de multi-tenant
 
@@ -179,55 +238,69 @@ Regras:
 - trial comporta-se como ativo ate expirar
 - overdue e blocked interrompem automacao paga
 - limites por plano usam conversas mensais como unidade principal
+- estado efetivo do tenant ainda e aplicado em `tenants.plan_code` e `tenants.subscription_status`
+- `subscriptions` registra o estado sincronizado do provedor externo
 
-## Estrutura desejada do projeto
+Endpoint atual de webhook:
 
-Estrutura atual e esperada:
+- `POST /v1/webhooks/asaas`
 
-```text
-AGENTS.md
-README.md
-docs/specs/
-db/
-src/domain/
-src/llm/
-test/domain/
-```
+Header obrigatorio:
 
-Quando o projeto crescer, manter a organizacao abaixo:
+- `asaas-access-token`
 
-```text
-src/
-  app/              bootstrap da aplicacao
-  api/              rotas, controllers, middleware
-  auth/             autenticacao, sessao, hashing
-  billing/          Asaas, planos, webhooks
-  tenants/          tenant resolution e isolamento
-  conversations/    historico, mensagens, quotas
-  leads/            captura e inbox
-  scheduling/       pre-agendamentos
-  whatsapp/         adaptador WhatsApp Cloud API
-  llm/              provider, prompts, schema validation
-  domain/           regras centrais e politicas
-  observability/    logs, audit trail, error handling
-```
+Variaveis de ambiente relacionadas:
 
-## Ordem de implementacao recomendada
+- `ASAAS_API_KEY`
+- `ASAAS_WEBHOOK_URL`
+- `ASAAS_WEBHOOK_SECRET`
 
-Seguir esta ordem para reduzir risco arquitetural:
+## Superficie HTTP atual
 
-1. fundacao de dominio e documentacao
-2. autenticacao e isolamento de tenant
-3. banco real e migrations
-4. onboarding wizard do tenant
-5. CRUD de perfil, FAQ e catalogo/servicos
-6. quotas e planos
-7. webhooks e adaptador do WhatsApp
-8. integracao de LLM com schema validation
-9. captura de leads
-10. captura de pre-agendamentos
-11. billing Asaas
-12. observabilidade e hardening
+Backend HTTP atual:
+
+- `GET /health`
+- `POST /v1/auth/register`
+- `POST /v1/auth/login`
+- `GET /v1/business-profile`
+- `PUT /v1/business-profile`
+- `GET /v1/business-hours`
+- `PUT /v1/business-hours`
+- `GET /v1/faq-items`
+- `POST /v1/faq-items`
+- `GET /v1/catalog-items`
+- `POST /v1/catalog-items`
+- `GET /v1/onboarding/status`
+- `GET /v1/subscription`
+- `POST /v1/webhooks/asaas`
+
+## Painel admin atual
+
+App:
+
+- `apps/admin`
+
+Telas implementadas:
+
+- `/register`
+- `/login`
+- `/dashboard`
+- `/onboarding`
+
+O painel deve continuar consumindo a API existente, sem duplicar regra de negocio no frontend.
+
+## Ordem de implementacao recomendada daqui para frente
+
+Seguir esta ordem:
+
+1. webhook e adaptador do WhatsApp
+2. persistencia de `conversations` e `messages`
+3. provider real de LLM com schema validation
+4. captura real de leads
+5. captura real de pre-agendamentos
+6. criacao de assinatura Asaas a partir do painel
+7. inbox operacional
+8. observabilidade e hardening
 
 ## Padrao de desenvolvimento
 
@@ -238,8 +311,9 @@ Sempre que alterar o projeto:
 - preservar isolamento multi-tenant
 - implementar testes para regras criticas
 - validar se a mudanca afeta billing, quota ou seguranca
-- evitar abstrações desnecessarias no MVP
+- evitar abstracoes desnecessarias no MVP
 - preferir codigo simples, testavel e evolutivo
+- atualizar a documentacao quando a superficie do produto mudar
 
 ## Checklist antes de concluir qualquer tarefa
 
@@ -253,26 +327,66 @@ Sempre que alterar o projeto:
 
 ## Comandos de verificacao
 
-Comando atual de testes:
+Backend:
+
+```bash
+npm start
+```
+
+Painel admin:
+
+```bash
+npm run admin:dev
+```
+
+Testes:
 
 ```bash
 npm test
 ```
 
+Build do admin:
+
+```bash
+npm run admin:build
+```
+
+Migrations:
+
+```bash
+npm run db:migrate
+```
+
 Antes de declarar qualquer tarefa concluida:
 
 - rodar os testes
-- confirmar status limpo do git se apropriado
-- atualizar documentacao se a mudanca alterou comportamento
+- rodar o build do painel se houve mudanca no frontend
+- atualizar documentacao relevante
+- confirmar o estado do git
+
+## Variaveis de ambiente criticas
+
+- `DATABASE_URL`
+- `AUTH_SECRET`
+- `NEXT_PUBLIC_API_BASE_URL`
+- `ASAAS_WEBHOOK_SECRET`
+- `ASAAS_API_KEY`
+- `ASAAS_WEBHOOK_URL`
+- `WHATSAPP_CLOUD_API_TOKEN`
+- `WHATSAPP_CLOUD_API_PHONE_NUMBER_ID`
+- `WHATSAPP_CLOUD_API_VERIFY_TOKEN`
+- `GEMINI_API_KEY`
+- `GEMINI_MODEL`
 
 ## Instrucao para futuras sessoes
 
 Se o contexto da conversa estiver incompleto ou tiver sido limpo:
 
 1. ler primeiro este `AGENTS.md`
-2. depois ler `docs/specs/2026-06-15-atendeai-mvp.md`
-3. inspecionar `README.md`
-4. inspecionar os modulos de dominio e testes
-5. continuar a implementacao respeitando as regras acima
+2. depois ler `docs/architecture/2026-06-15-project-state.md`
+3. depois ler `docs/specs/2026-06-15-atendeai-mvp.md`
+4. inspecionar `README.md`
+5. rodar `npm test`
+6. continuar a implementacao respeitando as regras acima
 
 Este arquivo e a memoria operacional do projeto. Em caso de conflito entre novas instrucoes do usuario e este arquivo, priorizar a instrucao mais recente do usuario, desde que nao comprometa isolamento multi-tenant, seguranca ou consistencia do produto.

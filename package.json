@@ -3,15 +3,21 @@
   "version": "0.1.0",
   "private": true,
   "engines": {
-    "node": ">=18"
+    "node": ">=20.9"
   },
   "type": "module",
+  "workspaces": [
+    "apps/*"
+  ],
   "scripts": {
     "start": "node src/app/server.js",
+    "admin:dev": "npm --workspace @atendeai/admin run dev",
+    "admin:build": "npm --workspace @atendeai/admin run build",
     "test": "node --test",
     "db:migrate": "node ./src/db/migrator.js"
   },
   "dependencies": {
+    "@google/genai": "^1.52.0",
     "pg": "^8.16.3"
   }
 }

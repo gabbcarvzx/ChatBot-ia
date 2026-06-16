@@ -1,12 +1,18 @@
-export function createBusinessProfileService({ businessProfileRepository }) {
+export function createBusinessProfileService({ businessProfileRepository, tenantRepository }) {
   async function getProfile(tenantId) {
-    const profile = await businessProfileRepository.findByTenantId(tenantId);
+    const [profile, tenant] = await Promise.all([
+      businessProfileRepository.findByTenantId(tenantId),
+      tenantRepository.findById(tenantId),
+    ]);
 
     if (!profile) {
       throw createHttpError(404, "Business profile was not found for this tenant.");
     }
 
-    return structuredClone(profile);
+    return structuredClone({
+      ...profile,
+      businessWhatsApp: tenant?.businessWhatsApp ?? null,
+    });
   }
 
   async function updateProfile(tenantId, payload) {
@@ -20,10 +26,18 @@ export function createBusinessProfileService({ businessProfileRepository }) {
       paymentMethods: Array.isArray(payload.paymentMethods)
         ? [...payload.paymentMethods]
         : profile.paymentMethods,
+      businessWhatsApp: payload.businessWhatsApp ?? profile.businessWhatsApp,
     };
 
-    const updated = await businessProfileRepository.updateByTenantId(tenantId, nextProfile);
-    return structuredClone(updated);
+    const [updatedProfile, tenant] = await Promise.all([
+      businessProfileRepository.updateByTenantId(tenantId, nextProfile),
+      tenantRepository.updateBusinessWhatsApp(null, tenantId, nextProfile.businessWhatsApp),
+    ]);
+
+    return structuredClone({
+      ...updatedProfile,
+      businessWhatsApp: tenant?.businessWhatsApp ?? null,
+    });
   }
 
   return {
