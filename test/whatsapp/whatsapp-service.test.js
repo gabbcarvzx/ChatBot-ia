@@ -283,3 +283,27 @@ test("ingestWebhook blocks paid automation when monthly conversation quota is ex
   assert.equal(sentMessages.length, 1);
   assert.match(sentMessages[0].text, /indisponivel/i);
 });
+
+test("ingestWebhook accepts inbound processing even when outbound transport fails", async () => {
+  const { service } = createBaseDependencies({
+    model: async () => ({
+      intent: "faq",
+      reply: "Aceitamos Pix e cartao.",
+      requestedAction: "faq_answer",
+      entities: {},
+      confidence: 0.95,
+      fallbackReason: null,
+    }),
+    whatsappOutboundClient: {
+      async sendTextMessage() {
+        throw new Error("Meta delivery failed");
+      },
+    },
+  });
+
+  const result = await service.ingestWebhook(buildWebhookPayload({ messageId: "wamid-outbound-fail" }));
+
+  assert.equal(result.accepted, true);
+  assert.equal(result.tenantResolved, true);
+  assert.equal(result.messagePersisted, true);
+});

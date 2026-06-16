@@ -13,13 +13,13 @@ O projeto ja possui:
 - painel administrativo inicial em Next.js
 - sincronizacao basica de billing com Asaas via webhook
 - base operacional do webhook do WhatsApp com persistencia tenant-scoped
+- envio outbound real pela WhatsApp Cloud API
 - provider Gemini ligado ao runtime conversacional com validacao estrutural
 - persistencia sincronizada de leads e pre-agendamentos aceitos por conversa
 - dominio central de plano, quota e guardrails
 
 O projeto ainda nao possui:
 
-- resposta outbound real pela WhatsApp Cloud API
 - inbox de leads e pre-agendamentos
 - criacao de assinatura no Asaas a partir do painel
 
@@ -169,7 +169,7 @@ Entidades principais ja persistidas e/ou modeladas:
 - webhook sincroniza `subscriptions`
 - estado efetivo do tenant e atualizado em `tenants`
 
-### 4. WhatsApp inbound base
+### 4. WhatsApp conversacional operacional
 
 - Meta pode validar o webhook em `GET /v1/webhooks/whatsapp`
 - eventos inbound chegam em `POST /v1/webhooks/whatsapp`
@@ -178,7 +178,8 @@ Entidades principais ja persistidas e/ou modeladas:
 - runtime carrega contexto tenant-scoped e chama o provider Gemini
 - acoes aceitas persistem `leads` e `pre_appointments` com unicidade por conversa
 - saidas invalidas ou de baixa confianca caem em handoff humano seguro
-- respostas ainda saem por stub outbound, sem chamada real para a Meta API
+- respostas saem por envio real na WhatsApp Cloud API
+- falhas de entrega outbound sao registradas sem reprocessar o inbound
 
 ## Regras de seguranca e isolamento
 
@@ -192,7 +193,6 @@ Entidades principais ja persistidas e/ou modeladas:
 
 ### Criticas para venda real
 
-- WhatsApp ainda nao conversa com o sistema
 - billing ainda nao cria assinatura nem fecha o ciclo comercial
 - nao existe inbox operacional para o cliente ver leads
 - o onboarding ainda nao e wizard por etapas
@@ -231,8 +231,8 @@ npm run admin:build
 
 ## Proximos blocos recomendados
 
-1. outbound real da WhatsApp Cloud API
-2. inbox minima de leads e pre-agendamentos no painel
-3. criacao de assinatura Asaas a partir do painel
-4. observabilidade operacional e trilha de auditoria comercial
-5. medicao de uso por tenant no runtime conversacional
+1. inbox minima de leads e pre-agendamentos no painel
+2. criacao de assinatura Asaas a partir do painel
+3. observabilidade operacional e trilha de auditoria comercial
+4. medicao de uso por tenant no runtime conversacional
+5. suporte futuro a multiplos numeros/credenciais outbound por tenant

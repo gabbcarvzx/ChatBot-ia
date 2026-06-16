@@ -150,12 +150,24 @@ export function createWhatsAppService({
           createdAt: new Date().toISOString(),
         });
 
-        await whatsappOutboundClient.sendTextMessage({
-          tenantId: tenant.id,
-          customerPhone: normalized.customerPhone,
-          text: outboundText,
-          conversationId: conversation.id,
-        });
+        try {
+          await whatsappOutboundClient.sendTextMessage({
+            tenantId: tenant.id,
+            customerPhone: normalized.customerPhone,
+            text: outboundText,
+            conversationId: conversation.id,
+          });
+        } catch (error) {
+          logger?.error?.("WhatsApp outbound delivery failed.", {
+            tenantId: tenant.id,
+            conversationId: conversation.id,
+            customerPhone: normalized.customerPhone,
+            phoneNumberId: normalized.phoneNumberId,
+            errorMessage: error.message,
+            providerStatusCode: error.statusCode ?? null,
+            providerBody: error.providerBody ?? null,
+          });
+        }
 
         return {
           accepted: true,
@@ -297,6 +309,7 @@ function normalizeWebhookPayload(payload) {
 
   return {
     displayPhoneNumber: normalizePhone(messageValue.metadata.display_phone_number),
+    phoneNumberId: messageValue.metadata.phone_number_id ?? null,
     customerPhone: normalizePhone(message.from),
     providerMessageId: message.id,
     providerEventId,

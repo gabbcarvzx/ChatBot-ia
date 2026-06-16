@@ -16,12 +16,12 @@ O AtendeAI nao e mais apenas fundacao de dominio. O repositorio agora possui:
 - onboarding operacional inicial
 - painel administrativo Next.js em `apps/admin`
 - sincronizacao inbound de billing com Asaas
+- integracao real de webhook e envio outbound com WhatsApp Cloud API
+- pipeline fim a fim de conversas com Gemini
+- persistencia tenant-scoped de `conversations`, `messages`, `leads` e `pre_appointments`
 
 Ainda nao possui:
 
-- integracao real com WhatsApp Cloud API
-- pipeline fim a fim de conversas
-- provider real de LLM
 - inbox de leads e pre-agendamentos
 - criacao de assinatura no Asaas a partir do painel
 
@@ -273,6 +273,8 @@ Backend HTTP atual:
 - `GET /v1/onboarding/status`
 - `GET /v1/subscription`
 - `POST /v1/webhooks/asaas`
+- `GET /v1/webhooks/whatsapp`
+- `POST /v1/webhooks/whatsapp`
 
 ## Painel admin atual
 

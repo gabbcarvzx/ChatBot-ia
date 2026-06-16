@@ -8,6 +8,8 @@ import { createDbPool } from "../../src/db/pool.js";
 
 assertDatabaseUrlForTests();
 process.env.WHATSAPP_CLOUD_API_VERIFY_TOKEN = "test-whatsapp-verify-token";
+process.env.WHATSAPP_CLOUD_API_TOKEN = "test-whatsapp-access-token";
+process.env.WHATSAPP_CLOUD_API_PHONE_NUMBER_ID = "test-whatsapp-phone-number-id";
 process.env.ASAAS_WEBHOOK_SECRET = "test-asaas-secret";
 
 const config = loadConfig();
@@ -22,6 +24,14 @@ function createDefaultTestLlmModel() {
     confidence: 0.95,
     fallbackReason: null,
   });
+}
+
+function createDefaultTestWhatsAppOutboundClient() {
+  return {
+    async sendTextMessage() {
+      return { accepted: true, provider: "whatsapp_test_mock" };
+    },
+  };
 }
 
 async function resetDatabase() {
@@ -48,6 +58,7 @@ async function resetDatabase() {
 async function startTestServer(overrides = {}) {
   const server = createServer({
     llmModel: createDefaultTestLlmModel(),
+    whatsappOutboundClient: createDefaultTestWhatsAppOutboundClient(),
     ...overrides,
   });
 
@@ -570,6 +581,49 @@ test("POST /v1/webhooks/whatsapp accepts unknown tenant payloads without persist
     assert.equal(response.status, 202);
     assert.equal(body.accepted, true);
     assert.equal(body.tenantResolved, false);
+  } finally {
+    await app.close();
+  }
+});
+
+test("POST /v1/webhooks/whatsapp returns 202 when outbound delivery fails after persistence", async () => {
+  const app = await startTestServer({
+    whatsappOutboundClient: {
+      async sendTextMessage() {
+        throw new Error("Meta delivery failed");
+      },
+    },
+  });
+
+  try {
+    const { tenantId, token } = await createAuthenticatedTenant(app, {
+      email: "whatsapp-outbound-failure@example.com",
+      companySlug: "tenant-whatsapp-outbound-failure",
+    });
+
+    await updateTenantWhatsApp(app, {
+      tenantId,
+      token,
+      businessWhatsApp: "5511999996666",
+    });
+
+    const response = await fetch(`${app.baseUrl}/v1/webhooks/whatsapp`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(
+        buildWhatsAppTextWebhookPayload({
+          displayPhoneNumber: "5511999996666",
+          messageId: "wamid-outbound-failure",
+        }),
+      ),
+    });
+
+    const body = await response.json();
+
+    assert.equal(response.status, 202);
+    assert.equal(body.accepted, true);
+    assert.equal(body.tenantResolved, true);
+    assert.equal(body.messagePersisted, true);
   } finally {
     await app.close();
   }

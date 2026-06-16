@@ -11,6 +11,8 @@ export function loadConfig(env = process.env) {
     asaasWebhookSecret: env.ASAAS_WEBHOOK_SECRET ?? "",
     geminiApiKey: env.GEMINI_API_KEY ?? "",
     geminiModel: env.GEMINI_MODEL ?? "",
+    whatsappCloudApiToken: env.WHATSAPP_CLOUD_API_TOKEN ?? "",
+    whatsappCloudApiPhoneNumberId: env.WHATSAPP_CLOUD_API_PHONE_NUMBER_ID ?? "",
     whatsappCloudApiVerifyToken: env.WHATSAPP_CLOUD_API_VERIFY_TOKEN ?? "",
     logLevel: env.LOG_LEVEL ?? "info",
     databaseUrl: env.DATABASE_URL ?? "",

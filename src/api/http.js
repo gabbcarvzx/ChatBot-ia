@@ -25,7 +25,7 @@ import { createBusinessProfileService } from "../tenants/business-profile-servic
 import { createCatalogItemService } from "../tenants/catalog-item-service.js";
 import { createFaqItemService } from "../tenants/faq-item-service.js";
 import { createOnboardingService } from "../tenants/onboarding-service.js";
-import { createWhatsAppOutboundClient } from "../whatsapp/whatsapp-outbound-client.js";
+import { createWhatsAppCloudClient } from "../whatsapp/whatsapp-cloud-client.js";
 import { createWhatsAppService } from "../whatsapp/whatsapp-service.js";
 
 export function createHttpApp(overrides = {}) {
@@ -75,7 +75,12 @@ export function createHttpApp(overrides = {}) {
         })
       : null);
   const whatsAppOutboundClient =
-    overrides.whatsappOutboundClient ?? createWhatsAppOutboundClient({ logger });
+    overrides.whatsappOutboundClient ??
+    createWhatsAppCloudClient({
+      accessToken: config.whatsappCloudApiToken,
+      phoneNumberId: config.whatsappCloudApiPhoneNumberId,
+      logger,
+    });
   const whatsAppService = createWhatsAppService({
     pool,
     tenantRepository,
