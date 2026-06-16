@@ -12,6 +12,7 @@ export function createWhatsAppService({
   preAppointmentRepository,
   whatsappOutboundClient,
   runtimeContextLoader,
+  usageLoader,
   model,
   logger,
   verifyToken,
@@ -134,6 +135,7 @@ export function createWhatsAppService({
           leadRepository,
           preAppointmentRepository,
           runtimeContextLoader,
+          usageLoader,
           model,
           logger,
         });
@@ -178,6 +180,7 @@ async function buildOutboundText({
   leadRepository,
   preAppointmentRepository,
   runtimeContextLoader,
+  usageLoader,
   model,
   logger,
 }) {
@@ -197,9 +200,10 @@ async function buildOutboundText({
   }
 
   try {
+    const usage = (await usageLoader?.(tenant.id, conversation)) ?? { monthlyConversations: 0 };
     const result = await processInboundMessage({
       tenant: runtimeTenant,
-      usage: { monthlyConversations: 0 },
+      usage,
       conversation,
       customerMessage,
       model,

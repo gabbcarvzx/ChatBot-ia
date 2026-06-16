@@ -1,5 +1,30 @@
 export function createSubscriptionRepository({ pool }) {
   return {
+    async findByProviderExternalId(provider, externalSubscriptionId) {
+      const { rows } = await pool.query(
+        `
+          SELECT
+            id,
+            tenant_id,
+            provider,
+            external_subscription_id,
+            plan_code,
+            status,
+            trial_ends_at,
+            current_period_ends_at,
+            created_at,
+            updated_at
+          FROM subscriptions
+          WHERE provider = $1
+            AND external_subscription_id = $2
+          LIMIT 1
+        `,
+        [provider, externalSubscriptionId],
+      );
+
+      return rows[0] ? mapSubscription(rows[0]) : null;
+    },
+
     async findLatestByTenantId(tenantId) {
       const { rows } = await pool.query(
         `

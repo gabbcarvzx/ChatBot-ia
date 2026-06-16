@@ -75,6 +75,28 @@ export function createConversationRepository({ pool }) {
 
       return rows[0] ? mapConversation(rows[0]) : null;
     },
+
+    async countMonthlyStartedByTenant(tenantId, referenceDate = new Date()) {
+      const monthStart = new Date(referenceDate);
+      monthStart.setUTCDate(1);
+      monthStart.setUTCHours(0, 0, 0, 0);
+
+      const nextMonthStart = new Date(monthStart);
+      nextMonthStart.setUTCMonth(nextMonthStart.getUTCMonth() + 1);
+
+      const { rows } = await pool.query(
+        `
+          SELECT COUNT(*)::int AS count
+          FROM conversations
+          WHERE tenant_id = $1
+            AND started_at >= $2
+            AND started_at < $3
+        `,
+        [tenantId, monthStart.toISOString(), nextMonthStart.toISOString()],
+      );
+
+      return rows[0]?.count ?? 0;
+    },
   };
 }
 

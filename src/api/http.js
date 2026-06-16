@@ -96,6 +96,12 @@ export function createHttpApp(overrides = {}) {
       faqItemRepository,
       catalogItemRepository,
     }),
+    usageLoader: async (tenantId, conversation) => ({
+      monthlyConversations: await conversationRepository.countMonthlyStartedByTenant(
+        tenantId,
+        conversation?.startedAt ?? new Date(),
+      ),
+    }),
     model: llmModel,
     logger,
     verifyToken: config.whatsappCloudApiVerifyToken,

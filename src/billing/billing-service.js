@@ -11,7 +11,7 @@ const EVENT_STATUS_RULES = [
   { pattern: /OVERDUE|LATE_PAYMENT/i, status: "overdue" },
   { pattern: /CANCEL|DELETE|REMOVE|INACTIV/i, status: "blocked" },
   { pattern: /TRIAL/i, status: "trial" },
-  { pattern: /RECEIVED|CONFIRMED|CREATED|RESTORED|ACTIV/i, status: "active" },
+  { pattern: /RECEIVED|CONFIRMED|RESTORED|ACTIV/i, status: "active" },
 ];
 
 export function createBillingService({ pool, tenantRepository, subscriptionRepository }) {
@@ -54,6 +54,18 @@ export function createBillingService({ pool, tenantRepository, subscriptionRepos
 
     if (!tenant) {
       throw createHttpError(404, "Tenant referenced by the Asaas webhook was not found.");
+    }
+
+    const existingSubscription = await subscriptionRepository.findByProviderExternalId(
+      "asaas",
+      normalized.externalSubscriptionId,
+    );
+
+    if (existingSubscription && existingSubscription.tenantId !== tenant.id) {
+      throw createHttpError(
+        409,
+        "Asaas external subscription is already bound to another tenant.",
+      );
     }
 
     const effectivePlanCode = normalized.planCode ?? tenant.planCode;

@@ -258,3 +258,28 @@ test("ingestWebhook falls back to handoff when commercial persistence fails", as
   assert.equal(sentMessages.length, 1);
   assert.match(sentMessages[0].text, /atendente humano/i);
 });
+
+test("ingestWebhook blocks paid automation when monthly conversation quota is exhausted", async () => {
+  const { service, sentMessages } = createBaseDependencies({
+    runtimeContextLoader: async () => ({
+      ...createRuntimeTenant(),
+      planCode: "pro",
+    }),
+    usageLoader: async () => ({
+      monthlyConversations: 250,
+    }),
+    model: async () => ({
+      intent: "faq",
+      reply: "Nao deveria responder.",
+      requestedAction: "faq_answer",
+      entities: {},
+      confidence: 0.99,
+      fallbackReason: null,
+    }),
+  });
+
+  await service.ingestWebhook(buildWebhookPayload({ messageId: "wamid-quota" }));
+
+  assert.equal(sentMessages.length, 1);
+  assert.match(sentMessages[0].text, /indisponivel/i);
+});
