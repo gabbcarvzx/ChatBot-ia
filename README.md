@@ -37,9 +37,11 @@ Base inicial do MVP do AtendeAI, um SaaS multi-tenant para assistente de WhatsAp
   - resolucao de tenant por `business_whatsapp`
   - persistencia de `conversations`, `messages` e `whatsapp_events`
   - pipeline de resposta tenant-scoped com provider Gemini
+  - envio outbound real pela WhatsApp Cloud API
   - persistencia sincronizada de `leads` e `pre_appointments` aceitos
   - atualizacao do registro comercial existente por `conversationId`
   - fallback seguro para handoff humano quando a saida do modelo for invalida
+  - conclusao segura do webhook mesmo quando a entrega outbound falha
 - migrations SQL versionadas para Postgres
 - testes automatizados do dominio com `node --test`
 
@@ -49,6 +51,8 @@ Defina `DATABASE_URL` com a connection string do seu banco Neon antes de subir a
 
 Defina `NEXT_PUBLIC_API_BASE_URL` com a URL da API backend usada pelo painel admin.
 Defina `ASAAS_WEBHOOK_SECRET` com o mesmo token configurado no painel do Asaas.
+Defina `WHATSAPP_CLOUD_API_TOKEN` com o token de acesso do app da Meta.
+Defina `WHATSAPP_CLOUD_API_PHONE_NUMBER_ID` com o `phone_number_id` conectado para envio.
 Defina `WHATSAPP_CLOUD_API_VERIFY_TOKEN` com o token de verificacao configurado no webhook da Meta.
 Defina `GEMINI_API_KEY` com a chave da Gemini Developer API.
 Defina `GEMINI_MODEL` com o modelo Gemini de menor custo escolhido para o runtime.
@@ -105,8 +109,8 @@ test/domain/                 regressao do dominio central
 
 ## Proximas etapas recomendadas
 
-1. integrar envio outbound real com a WhatsApp Cloud API
-2. adicionar inbox de leads e pre-agendamentos no painel
-3. integrar Asaas com webhook e sincronizacao real de assinatura
-4. transformar o onboarding atual em wizard completo por etapas
-5. adicionar medicao de uso por tenant no runtime
+1. adicionar inbox de leads e pre-agendamentos no painel
+2. integrar Asaas com webhook e sincronizacao real de assinatura
+3. transformar o onboarding atual em wizard completo por etapas
+4. adicionar medicao de uso por tenant no runtime
+5. ampliar observabilidade e auditoria comercial por tenant
