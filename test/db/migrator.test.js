@@ -15,6 +15,10 @@ const migration002Path = path.resolve(process.cwd(), "db/migrations/002_align_au
 const migration002Sql = readFileSync(migration002Path, "utf8");
 const migration003Path = path.resolve(process.cwd(), "db/migrations/003_enforce_global_owner_email.sql");
 const migration003Sql = readFileSync(migration003Path, "utf8");
+const migration005Path = path.resolve(process.cwd(), "db/migrations/005_add_whatsapp_events.sql");
+const migration005Sql = readFileSync(migration005Path, "utf8");
+const migration006Path = path.resolve(process.cwd(), "db/migrations/006_enforce_commercial_conversation_uniqueness.sql");
+const migration006Sql = readFileSync(migration006Path, "utf8");
 
 test.after(async () => {
   await pool.end();
@@ -169,6 +173,84 @@ test("003_enforce_global_owner_email fails fast when legacy duplicate emails exi
       () => client.query(migration003Sql),
       /Cannot enforce global owner email uniqueness because duplicate emails already exist across tenants\./,
     );
+  } finally {
+    await client.query("ROLLBACK").catch(() => {});
+    client.release();
+  }
+});
+
+test("005_add_whatsapp_events creates tenant-scoped webhook idempotency storage", async () => {
+  const client = await pool.connect();
+  const schemaName = `migration_005_${randomUUID().replace(/-/g, "_")}`;
+
+  try {
+    await client.query("BEGIN");
+    await client.query(`CREATE SCHEMA "${schemaName}"`);
+    await client.query(`SET LOCAL search_path TO "${schemaName}", public`);
+    await client.query(readFileSync(path.resolve(process.cwd(), "db/migrations/001_initial_schema.sql"), "utf8"));
+    await client.query(readFileSync(path.resolve(process.cwd(), "db/migrations/004_enforce_conversation_tenant_integrity.sql"), "utf8"));
+
+    const { rows: beforeRows } = await client.query(
+      `
+        SELECT table_name
+        FROM information_schema.tables
+        WHERE table_schema = $1
+          AND table_name = 'whatsapp_events'
+      `,
+      [schemaName],
+    );
+    assert.equal(beforeRows.length, 0);
+
+    await client.query(migration005Sql);
+
+    const { rows } = await client.query(
+      `
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = $1
+          AND table_name = 'whatsapp_events'
+        ORDER BY ordinal_position
+      `,
+      [schemaName],
+    );
+
+    assert.deepEqual(
+      rows.map((row) => row.column_name),
+      ["id", "tenant_id", "provider_event_id", "provider_message_id", "payload", "status", "received_at", "processed_at"],
+    );
+  } finally {
+    await client.query("ROLLBACK").catch(() => {});
+    client.release();
+  }
+});
+
+test("006_enforce_commercial_conversation_uniqueness adds one-record-per-conversation constraints", async () => {
+  const client = await pool.connect();
+  const schemaName = `migration_006_${randomUUID().replace(/-/g, "_")}`;
+
+  try {
+    await client.query("BEGIN");
+    await client.query(`CREATE SCHEMA "${schemaName}"`);
+    await client.query(`SET LOCAL search_path TO "${schemaName}", public`);
+    await client.query(readFileSync(path.resolve(process.cwd(), "db/migrations/001_initial_schema.sql"), "utf8"));
+
+    await client.query(migration006Sql);
+
+    const { rows } = await client.query(
+      `
+        SELECT conname
+        FROM pg_constraint
+        WHERE connamespace = $1::regnamespace
+          AND conname IN ('uq_leads_tenant_conversation', 'uq_pre_appointments_tenant_conversation')
+        ORDER BY conname
+      `,
+      [schemaName],
+    );
+
+    assert.deepEqual(rows.map((row) => row.conname), [
+      "uq_leads_tenant_conversation",
+      "uq_pre_appointments_tenant_conversation",
+    ]);
   } finally {
     await client.query("ROLLBACK").catch(() => {});
     client.release();
